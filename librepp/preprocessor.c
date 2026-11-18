@@ -21,6 +21,24 @@ struct transformed_string
 	int	*align;
 };
 
+static void	process_lost_char(wchar_t	c, int	a, wchar_t	*lost_char, int	*lost_char_align, int	**lost_char_align_hole, wchar_t	*lost_char_hole)
+{
+	if((c==' ' || c=='\t'))return;
+	(*lost_char) = c;
+	(*lost_char_align) = a;
+	DEBUG("... lost '%C'=>%d\n", (*lost_char), (*lost_char_align));
+	if((*lost_char_align_hole))
+	{
+		if((*lost_char_hole) != (*lost_char))
+		{
+			DEBUG("filling hole '%C' with '%C'\n", (*lost_char_hole), (*lost_char));
+		}
+		*(*lost_char_align_hole) = (*lost_char_align);
+		(*lost_char_align_hole) = NULL;
+		(*lost_char_align) = -1;
+	}
+}
+
 static struct transformed_string	replace(struct transformed_string	its, regmatch_t	*m, wchar_t	*r)
 {
 	wchar_t	*out, *p;
@@ -42,24 +60,6 @@ static struct transformed_string	replace(struct transformed_string	its, regmatch
 	int		*lost_char_align_hole = NULL;
 	wchar_t	lost_char_hole = 0;
 
-	void	process_lost_char(wchar_t	c, int	a)
-	{
-		if((c==' ' || c=='\t'))return;
-		lost_char = c;
-		lost_char_align = a;
-		DEBUG("... lost '%C'=>%d\n", lost_char, lost_char_align);
-		if(lost_char_align_hole)
-		{
-			if(lost_char_hole != lost_char)
-			{
-				DEBUG("filling hole '%C' with '%C'\n", lost_char_hole, lost_char);
-			}
-			*lost_char_align_hole = lost_char_align;
-			lost_char_align_hole = NULL;
-			lost_char_align = -1;
-		}
-	}
-
 	while(*r)
 	{
 		if(*r == '\\' && r[1])
@@ -71,7 +71,7 @@ static struct transformed_string	replace(struct transformed_string	its, regmatch
 			// copying from 'x' to 'e' from input
 			// ... see if we are skipping any non-whitespace chars
 			while(inp < x)
-				process_lost_char(*inp++, *ina++);
+				process_lost_char(*inp++, *ina++, &lost_char, &lost_char_align, &lost_char_align_hole, &lost_char_hole);
 			inp += (m[1 + i].rm_eo - m[1 + i].rm_so);
 			ina += (m[1 + i].rm_eo - m[1 + i].rm_so);
 
@@ -110,7 +110,7 @@ static struct transformed_string	replace(struct transformed_string	its, regmatch
 		}
 	}
 	while(inp<its.string + m->rm_eo)
-		process_lost_char(*inp++, *ina++);
+		process_lost_char(*inp++, *ina++, &lost_char, &lost_char_align, &lost_char_align_hole, &lost_char_hole);
 
 	memcpy(p, its.string+m->rm_eo, sizeof(wchar_t)*(its.length - m->rm_eo));
 	memcpy(pa, its.align+m->rm_eo, sizeof(int)*(its.length - m->rm_eo));
